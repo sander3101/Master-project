@@ -25,6 +25,10 @@ accelerate launch train.py
 - The training script is by default set to cache the dataset in the first run, therefore it will take longer the first time running the training script.
 
 
+## Sampling and Evaluation
+
+Change model path and sampling path and run the bash script for automated training and sampling automated_training_and_sampling.sh, or follow the manual steps for sampling and then evaluation.
+
 ## Acknowledgements
 
 - The Denoising diffusion probabilistic model and the Unet architecture is based on the implementation from [kazuto1011/r2dm](https://github.com/kazuto1011/r2dm).
