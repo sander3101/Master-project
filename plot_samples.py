@@ -9,6 +9,9 @@ matplotlib.rcParams["ps.fonttype"] = 42
 
 
 def plot_result():
+    """
+        Plots all metrics in a grid for a given model
+    """
 
     timesteps = [2, 4, 8, 16, 32, 64, 128]
     baselines = [34.44, 0.923, 3.911, 0.050, 0.105]
@@ -72,6 +75,9 @@ def plot_result():
 
 
 def plot_result_changed():
+    """
+        Plots all metrics in a grid for a given model. This function plots the metrics in a more readable plot. The grid is 3x2
+    """
 
     timesteps = [2, 4, 8, 16, 32, 64, 128]
     baselines = [34.44, 0.923, 3.911, 0.050, 0.105]

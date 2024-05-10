@@ -18,18 +18,11 @@ import random as rnd
 from utils.lidar import LiDARUtility
 
 
-# def upsampling(img):
-#     image = img[0, :, :]
-#     N, M = image.shape
-#     mask = np.zeros((N, M))
-
-#     for i in range(0, N, 2):
-#         mask[i, :] = 1
-
-#     return mask
-
 
 def upsampling(img, loss_level=4):
+    """
+        Generates upsampling mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -42,6 +35,9 @@ def upsampling(img, loss_level=4):
 
 
 def add_sparsity(img, sparsity_level=0.1):
+    """
+        Generates simple line mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -53,6 +49,9 @@ def add_sparsity(img, sparsity_level=0.1):
 
 
 def add_pepper(img, sparsity_level=0.1):
+    """
+        Generates pepper noise mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -163,6 +162,11 @@ def add_complex_sparsity(
 
 
 def get_inpainting_mask(args, coords):
+    """
+        Generates the desired conditional mask for conditional generating
+    """
+
+    # Defines dataset
     dataset = ds.load_dataset(
         path=f"data/kitti_360",
         name="spherical-1024",
@@ -172,6 +176,7 @@ def get_inpainting_mask(args, coords):
 
     print(len(dataset))
 
+    # Create dataloader
     dataloader = DataLoader(
         dataset,
         batch_size=1,
@@ -181,6 +186,7 @@ def get_inpainting_mask(args, coords):
         pin_memory=True,
     )
 
+    # Generates LiDAR utilities used for transformation and normalization
     lidar_utils = LiDARUtility(
         resolution=(64, 1024),
         image_format="log_depth",
@@ -189,9 +195,6 @@ def get_inpainting_mask(args, coords):
         ray_angles=coords,
     )
     lidar_utils.to(args.device)
-
-    # batch = next(iter(dataloader))["xyz"].to(args.device)
-    # batch = next(iter(dataloader))
 
     if args.sample_id == -1:
         args.sample_id = rnd.randint(0, len(dataset))
@@ -210,12 +213,13 @@ def get_inpainting_mask(args, coords):
         mode="nearest-exact",
     )
 
+    # Defines the sparsity level to be 10%-30% if not defined
     if args.sparsity is None:
         sparsity = rnd.uniform(0.1, 0.3)
     else:
         sparsity = args.sparsity
 
-    if args.diffusion_mode == "simple":
+    if args.diffusion_mode == "simple": # If simple lines mask
         mask = torch.stack(
             [
                 torch.tensor(add_sparsity(element, sparsity_level=sparsity))
@@ -223,23 +227,23 @@ def get_inpainting_mask(args, coords):
             ]
         )
 
-    elif args.diffusion_mode == "complex":
+    elif args.diffusion_mode == "complex": # If complex lines mask
         mask = torch.stack(
             [
                 torch.tensor(add_complex_sparsity(element, sparsity_level=sparsity))
                 for element in x
             ]
         )
-    elif args.diffusion_mode == "pepper":
+    elif args.diffusion_mode == "pepper": # If pepper noise mask
         mask = torch.stack(
             [
                 torch.tensor(add_pepper(element, sparsity_level=sparsity))
                 for element in x
             ]
         )
-    elif args.diffusion_mode == "upsample":
+    elif args.diffusion_mode == "upsample": # If upsampling mask
         mask = torch.stack([torch.tensor(upsampling(element)) for element in x])
-    elif args.diffusion_mode == "mixed":
+    elif args.diffusion_mode == "mixed": # If mixed training tasks
         random_select = rnd.random()
         if random_select >= 0.7:
             N, M = x[0, 0, :, :].shape
@@ -300,14 +304,10 @@ def main(args):
     # Sampling (reverse diffusion)
     # =================================================================================
 
-    # xs = ddpm.sample(
-    #     batch_size=args.batch_size,
-    #     num_steps=args.sampling_steps,
-    #     return_all=True,
-    # ).clamp(-1, 1)
 
     sample_x, mask = get_inpainting_mask(args, ddpm.denoiser.coords)
 
+    # Defines the conditional sampling function
     xs = ddpm.conditional_sample(
         batch_size=1,
         mode="ddpm",
@@ -325,6 +325,9 @@ def main(args):
     xs[:, :, [0]] = lidar_utils.revert_depth(xs[:, :, [0]]) / lidar_utils.max_depth
 
     def render(x):
+        """
+            Render image and point cloud of input sample x
+        """
         img = einops.rearrange(x, "B C H W -> B 1 (C H) W")
         img = utils.render.colorize(img) / 255
         xyz = lidar_utils.to_xyz(x[:, [0]] * lidar_utils.max_depth)
@@ -341,6 +344,7 @@ def main(args):
         )
         return img, bev
 
+    ########### Generates several different masks used for visual purposes in thesis illustrations and for testing ###########
     orig = lidar_utils.denormalize(sample_x)
     orig[:, [0]] = lidar_utils.revert_depth(orig[:, [0]]) / lidar_utils.max_depth
 
@@ -386,6 +390,9 @@ def main(args):
         nrow=2,
     )
 
+    ###########################################################################################################################
+
+    # Generates sampling video of conditional sampling
     video = imageio.get_writer("samples.mp4", mode="I", fps=60)
     for x in tqdm(xs, desc="making video..."):
         img, bev = render(x)

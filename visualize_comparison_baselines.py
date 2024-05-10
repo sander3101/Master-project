@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import torch
 from utils.render import colorize, make_Rt, render_point_clouds
 
+# Filepath name for the results of all baselines for comparison
 methods = [
     "interp_nearest",
     "interp_bilinear",
@@ -19,6 +20,7 @@ methods = [
     "diffusion_r2dm",
 ]
 
+# Transforming baseline names for more readable results on plot
 translation = {
     "interp_nearest": "Nearest neighbor",
     "interp_bilinear": "Bilinear",
@@ -34,6 +36,9 @@ translation = {
 
 
 def render_xyz(xyz, max_depth=80.0):
+    """
+        Transfers 2D intensity, depth images, mask, and point xyz values to a 3D point cloud.
+    """
     z_min, z_max = -2 / max_depth, 0.5 / max_depth
     z = (xyz[:, [2]] - z_min) / (z_max - z_min)
     colors = colorize(z.clamp(0, 1), cm.viridis) / 255
@@ -46,12 +51,18 @@ def render_xyz(xyz, max_depth=80.0):
 
 
 def redner_img(img):
+    """
+        Renders image for visualization
+    """
     img = colorize(img)
     img = einops.rearrange(img, "B C H W -> B H W C")
     return img
 
 
 def parse_data(index, root):
+    """
+        Parse data from all baselines
+    """
     root = Path(root)
 
     # prediction
@@ -87,6 +98,7 @@ Ds = redner_img(Ds / 80.0)  # (B,H,W,3)
 Rs = redner_img(Rs)  # (B,H,W,3)
 BEVs = render_xyz(XYZs)  # (B,H,W,3)
 
+# Plots all baseline results in a grid
 for i, method in enumerate(methods):
     fig, ax = plt.subplots(
         3,

@@ -27,6 +27,9 @@ ddpm, lidar_utils, _ = utils.inference.setup_model(checkpoint, "cpu")
 
 
 def render(xyz):
+    """
+        Transfers 2D intensity, depth images, mask, and point xyz values to a 3D point cloud.
+    """
     xyz /= lidar_utils.max_depth
     z_min, z_max = -2 / lidar_utils.max_depth, 0.5 / lidar_utils.max_depth
     z = (xyz[:, [2]] - z_min) / (z_max - z_min)
@@ -42,6 +45,10 @@ def render(xyz):
 
 
 def check_equality(sample1, sample2):
+    """
+        Check that two files are the same.
+        Used to debug for corrupt files
+    """
     equality = torch.eq(sample1, sample2)
 
     counter1 = 0
@@ -58,6 +65,10 @@ def check_equality(sample1, sample2):
 
 
 def change_lidargen_data_order(path):
+    """
+        LiDARGen samples have a different sampling id order on all samples, although the data is the same.
+        This function converts the order to match the rest of the baseline sample id's.
+    """
     with open("lidargen_test_paths.txt") as f:
         lidargen_test_paths = f.read().splitlines()
 
@@ -71,6 +82,10 @@ def change_lidargen_data_order(path):
 
 
 def check_common_files(paths):
+    """
+        Check for common files in all models. 
+        This is in case of corrupt files or lost files during transfering from servers or databases.
+    """
     with open("lidargen_test_paths.txt") as f:
         lidargen_test_paths = f.read().splitlines()
         lidargen_test_paths = [

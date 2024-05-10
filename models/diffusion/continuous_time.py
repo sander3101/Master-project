@@ -248,6 +248,9 @@ class ContinuousTimeGaussianDiffusion(base.GaussianDiffusion):
         mask: torch.Tensor = None,
         x_0: torch.Tensor = None,
     ):
+        """
+            Sampling method that takes in a conditonal mask and generates a sample with a condition for a given timestep
+        """
         x = self.randn(batch_size, *self.sampling_shape, rng=rng, device=self.device)
         if return_all:
             out = [x]
@@ -264,8 +267,8 @@ class ContinuousTimeGaussianDiffusion(base.GaussianDiffusion):
             step_t = steps[:, i]
             step_s = steps[:, i + 1]
             x = self.p_sample(x, step_t, step_s, rng=rng, mode=mode)
-            ### Fill old are with original image and only keep generated part ###
-
+            
+            ### Fill old area with original image and only keep generated part ###
             if not mask is None:
                 x = x * mask + (1 - mask) * x_0
 
@@ -286,63 +289,3 @@ class ContinuousTimeGaussianDiffusion(base.GaussianDiffusion):
         var = sigma_t.pow(2) - alpha_ts.pow(2) * sigma_s.pow(2)
         x_t = mean + var.sqrt() * var_noise
         return x_t
-
-    # @torch.inference_mode()
-    # def repaint(
-    #     self,
-    #     known: torch.Tensor,
-    #     mask: torch.Tensor,
-    #     num_steps: int,
-    #     num_resample_steps: int = 1,  # "n" of the RePaint paper
-    #     jump_length: int = 1,
-    #     progress: bool = True,
-    #     rng: list[torch.Generator] | torch.Generator | None = None,
-    #     return_all: bool = False,
-    # ):
-    #     # re-implementation of RePaint (https://arxiv.org/abs/2201.09865)
-    #     assert num_resample_steps > 0
-    #     assert jump_length > 0
-    #     batch_size = known.shape[0]
-    #     x_t = self.randn(batch_size, *self.sampling_shape, rng=rng, device=self.device)
-    #     steps = torch.linspace(1, 0, num_steps + 1, device=self.device)
-    #     steps = steps[None].repeat_interleave(batch_size, dim=0)
-
-    #     if return_all:
-    #         out = [x_t]
-
-    #     for i in tqdm(
-    #         range(num_steps), desc="RePaint", leave=False, disable=not progress
-    #     ):
-    #         for j in range(num_resample_steps):
-    #             step_t = steps[:, [i]]
-    #             step_s = steps[:, [i + 1]]
-    #             interp = torch.linspace(0, 1, jump_length + 1, device=self.device)
-    #             r_steps = step_t + interp[None] * (step_s - step_t)
-
-    #             # t->s (reverse diffusion)
-    #             x = x_t
-    #             for k in range(jump_length):
-    #                 r_step_t = r_steps[:, k]
-    #                 r_step_s = r_steps[:, k + 1]
-    #                 noise = self.randn_like(known, rng=rng)
-    #                 known_s = self.q_sample(known, r_step_s, noise)
-    #                 unknown_s = self.p_sample(x, r_step_t, r_step_s, rng=rng)
-    #                 x = mask * known_s + (1 - mask) * unknown_s
-    #             x_s = x
-
-    #             if return_all:
-    #                 out.append(x_s)
-
-    #             if (i == num_steps - 1) or (j == num_resample_steps - 1):
-    #                 x_t = x
-    #                 break
-
-    #             # s->t (forward diffusion)
-    #             x = x_s
-    #             for k in range(jump_length, 0, -1):
-    #                 r_step_t = r_steps[:, k - 1]
-    #                 r_step_s = r_steps[:, k]
-    #                 x = self.q_step_back(x, r_step_t, r_step_s, rng=rng)
-    #             x_t = x
-
-    #     return torch.stack(out) if return_all else x_s

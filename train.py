@@ -33,6 +33,10 @@ torch._dynamo.config.suppress_errors = True
 
 
 def train(cfg):
+    """
+        Training loop script
+    """
+
     torch.backends.cudnn.benchmark = True
     project_dir = Path(cfg.output_dir) / cfg.dataset / cfg.lidar_projection
 
@@ -105,7 +109,7 @@ def train(cfg):
     if accelerator.is_main_process:
         print(f"number of parameters: {utils.training.count_parameters(unet):,}")
 
-    if cfg.diffusion_timesteps_type == "discrete":
+    if cfg.diffusion_timesteps_type == "discrete": # Discrete time diffusion
         ddpm = DiscreteTimeGaussianDiffusion(
             denoiser=unet,
             criterion=cfg.criterion,
@@ -113,7 +117,7 @@ def train(cfg):
             objective=cfg.diffusion_objective,
             beta_schedule=cfg.diffusion_beta_schedule,
         )
-    elif cfg.diffusion_timesteps_type == "continuous":
+    elif cfg.diffusion_timesteps_type == "continuous": # Continuous time diffusion
         ddpm = ContinuousTimeGaussianDiffusion(
             denoiser=unet,
             criterion=cfg.criterion,
@@ -155,7 +159,8 @@ def train(cfg):
         eps=cfg.adam_epsilon,
     )
 
-    if cfg.dataset == "all":
+    # Defines datasets for training
+    if cfg.dataset == "all": # All three datasets: SynLiDAR, KITTI-RAW, KITTI-360
         dataset1 = ds.load_dataset(
             path=f"data/synlidar",
             name=cfg.lidar_projection,
@@ -180,7 +185,7 @@ def train(cfg):
         dataset = ds.concatenate_datasets([dataset1, dataset2, dataset3])
         dataset = dataset.shuffle(seed=cfg.seed)
 
-    else:
+    else: # Designated dataset only
         dataset = ds.load_dataset(
             path=f"data/{cfg.dataset}",
             name=cfg.lidar_projection,
@@ -314,6 +319,9 @@ def train(cfg):
         return mask
 
     def add_sparsity(img, sparsity_level=0.1):
+        """
+            Generates simple lines mask
+        """
         image = img[0, :, :]
         N, M = image.shape
         mask = np.zeros((N, M))
@@ -324,6 +332,9 @@ def train(cfg):
         return mask
 
     def add_pepper(img, sparsity_level=0.1):
+        """
+            Generates pepper noise mask
+        """
         image = img[0, :, :]
         N, M = image.shape
         mask = np.zeros((N, M))
@@ -335,6 +346,9 @@ def train(cfg):
         return mask
 
     def upsampling(img, loss_level=2):
+        """
+            Generates upsampling mask
+        """
         image = img[0, :, :]
         N, M = image.shape
         mask = np.zeros((N, M))
@@ -351,6 +365,9 @@ def train(cfg):
         sparsity=None,
         options=["simple", "complex", "pepper", "upsample"],
     ):
+        """
+            Preprocessess the data, and generates the designated conditional mask for training
+        """
         x = []
         if cfg.train_depth:
             x += [lidar_utils.convert_depth(batch["depth"])]
@@ -364,13 +381,13 @@ def train(cfg):
             mode="nearest-exact",
         )
 
-        if cfg.diffusion_task == "generate":
+        if cfg.diffusion_task == "generate": # Generate 3D point cloud unconditional
             return x, torch.ones_like(x, device=device)
 
-        if sparsity is None:
+        if sparsity is None: # Sets sparsity level to 10%-30% if not defined
             sparsity = rnd.uniform(0.1, 0.3)
 
-        if mode == "simple":
+        if mode == "simple": # Simple lines mask
             mask = torch.stack(
                 [
                     torch.tensor(add_sparsity(element, sparsity_level=sparsity))
@@ -378,26 +395,28 @@ def train(cfg):
                 ]
             )
 
-        elif mode == "complex":
+        elif mode == "complex": # Complex lines mask
             mask = torch.stack(
                 [
                     torch.tensor(add_complex_sparsity(element, sparsity_level=sparsity))
                     for element in x
                 ]
             )
-        elif mode == "pepper":
+        elif mode == "pepper": # Pepper noise mask
             mask = torch.stack(
                 [
                     torch.tensor(add_pepper(element, sparsity_level=sparsity))
                     for element in x
                 ]
             )
-        elif mode == "upsample":
+        elif mode == "upsample": # Upsampling mask
             mask = torch.stack(
+                # Various upsampling rate from 2-8
                 # [torch.tensor(upsampling(element, rnd.randint(2, 8))) for element in x]
+                # 4x upsampling rate
                 [torch.tensor(upsampling(element, 4)) for element in x]
             )
-        elif mode == "mixed":
+        elif mode == "mixed": # Mixed training task
             random_select = rnd.choice(options)
 
             if random_select == "complex":
@@ -451,11 +470,17 @@ def train(cfg):
         return x, mask.unsqueeze(1).to(device)
 
     def split_channels(image: torch.Tensor):
+        """
+            Split depth and reflectance/intensity channels
+        """
         depth, rflct = torch.split(image, channels, dim=1)
         return depth, rflct
 
     @torch.inference_mode()
     def log_images(image, tag: str = "name", global_step: int = 0):
+        """
+            Creates images and for tensorboard for visual purposes
+        """
         image = lidar_utils.denormalize(image)
         out = dict()
         depth, rflct = split_channels(image)
@@ -521,6 +546,7 @@ def train(cfg):
                 if global_step == 1:
                     log_images(x_0, "image", global_step)
 
+                # Conditional sample image
                 if global_step % cfg.save_image_steps == 0:
                     ddpm_ema.ema_model.eval()
                     sample = ddpm_ema.ema_model.conditional_sample(
@@ -531,24 +557,6 @@ def train(cfg):
                         x_0=x_0,
                     )
                     log_images(sample, "sample", global_step)
-                    # if cfg.diffusion_task == "inpaint":
-                    #     ddpm_ema.ema_model.eval()
-                    #     sample = ddpm_ema.ema_model.conditional_sample(
-                    #         batch_size=masks.shape[0],
-                    #         num_steps=cfg.diffusion_num_sampling_steps,
-                    #         rng=torch.Generator(device=device).manual_seed(0),
-                    #         mask=masks.float(),
-                    #         x_0=x_0,
-                    #     )
-                    #     log_images(sample, "sample", global_step)
-                    # else:
-                    #     ddpm_ema.ema_model.eval()
-                    #     sample = ddpm_ema.ema_model.sample(
-                    #         batch_size=cfg.batch_size_eval,
-                    #         num_steps=cfg.diffusion_num_sampling_steps,
-                    #         rng=torch.Generator(device=device).manual_seed(0),
-                    #     )
-                    #     log_images(sample, "sample", global_step)
 
                 if global_step % cfg.save_model_steps == 0:
                     save_dir = Path(tracker.logging_dir) / "models"

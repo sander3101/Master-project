@@ -119,11 +119,14 @@ class GaussianDiffusion(nn.Module):
         steps: torch.Tensor,
         mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        # shared in continuous/discrete versions
+        """
+            Calculates the loss during training
+        """
         mask = torch.ones_like(x_0) if mask is None else mask
         noise = self.randn_like(x_0)
         xt = self.q_sample(x_0, steps, noise)
 
+        # Conditional masking as explained in thesis
         xt = xt * mask.float() + (1 - mask.float()) * x_0
 
         condition = self.get_denoiser_condition(steps)
@@ -131,8 +134,10 @@ class GaussianDiffusion(nn.Module):
 
         target = self.get_target(x_0, steps, noise)
         loss = self.criterion(prediction, target)  # (B,C,H,W)
+        # Loss is limited to only be calculated for masked area
         loss = einops.reduce(loss * mask, "B ... -> B ()", "sum")
         mask = einops.reduce(mask, "B ... -> B ()", "sum")
+        # To get consistent proper progress the loss is calculated from average over only masked pixels.
         loss = loss / mask.add(1e-8)  # (B,)
         loss = (loss * self.get_loss_weight(steps)).mean()
         return loss
@@ -140,7 +145,9 @@ class GaussianDiffusion(nn.Module):
     def forward(
         self, x_0: torch.Tensor, mask: torch.Tensor | None = None
     ) -> torch.Tensor:
-        # shared in continuous/discrete versions
+        """
+            Forward method
+        """
         steps = self.sample_timesteps(x_0.shape[0], x_0.device)
         loss = self.p_loss(x_0, steps, mask)
         return loss

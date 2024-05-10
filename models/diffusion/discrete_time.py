@@ -208,6 +208,9 @@ class DiscreteTimeGaussianDiffusion(base.GaussianDiffusion):
         mask: torch.Tensor = None,
         x_0: torch.Tensor = None,
     ):
+        """
+            Sampling method that takes in a conditonal mask and generates a sample with a condition for a given timestep
+        """
         x = self.randn(batch_size, *self.sampling_shape, rng=rng, device=self.device)
         if return_all:
             out = [x]
@@ -221,8 +224,8 @@ class DiscreteTimeGaussianDiffusion(base.GaussianDiffusion):
             timesteps = torch.full((batch_size,), timestep, device=self.device).long()
 
             x = self.p_sample(x, timesteps)
-            ### Fill old are with original image and only keep generated part ###
 
+            ### Fill old are with original image and only keep generated part ###
             if not mask is None:
                 x = x * mask + (1 - mask) * x_0
 

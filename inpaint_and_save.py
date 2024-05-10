@@ -117,6 +117,9 @@ def add_complex_sparsity(
 
 
 def add_sparsity(img, sparsity_level=0.1):
+    """
+        Generates simple lines mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -128,6 +131,9 @@ def add_sparsity(img, sparsity_level=0.1):
 
 
 def add_pepper(img, sparsity_level=0.1):
+    """
+        Generates pepper noise mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -140,6 +146,9 @@ def add_pepper(img, sparsity_level=0.1):
 
 
 def half_loss(img):
+    """
+        Generates a 2x upsampling mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -151,6 +160,9 @@ def half_loss(img):
 
 
 def quarter_loss(img):
+    """
+        Generates a 4x upsampling mask
+    """
     image = img[0, :, :]
     N, M = image.shape
     mask = np.zeros((N, M))
@@ -182,6 +194,7 @@ def main(args):
     if accelerator.is_local_main_process:
         print(f"{cfg=}")
 
+    ########################### Different dataloaders for the different datasets ###########################
     # if cfg.dataset == "all":
     #     dataset1 = ds.load_dataset(
     #         path=f"data/synlidar",
@@ -235,6 +248,8 @@ def main(args):
         num_proc=cfg.num_workers,
     ).with_format("torch")
 
+    #########################################################################################################
+
     dataloader = DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -250,6 +265,9 @@ def main(args):
     helper, dataloader = accelerator.prepare(helper, dataloader)
 
     def postprocess(sample):
+        """
+            Postprocesses data after sampling
+        """
         sample = helper.denormalize(sample)
         depth, rflct = sample[:, [0]], sample[:, [1]]
         depth = helper.revert_depth(depth)
@@ -257,6 +275,7 @@ def main(args):
 
         return torch.cat([depth, xyz, rflct], dim=1)
 
+    # Samples all data with a upsampling mask for evaluation
     for batch in tqdm(
         dataloader,
         desc="sampling...",
@@ -272,14 +291,14 @@ def main(args):
         mask = batch["mask"].float().to(device)
         targets = torch.cat([depth, rflct], dim=1)
 
-        ### 1/2 loss ###
+        ### 2x upsampling ###
         # mask = (
         #     torch.stack([torch.tensor(half_loss(element)) for element in targets])
         #     .unsqueeze(1)
         #     .to(device)
         # )
 
-        ### 1/4 loss ###
+        ### 4x upsampling ###
         mask = (
             torch.stack([torch.tensor(quarter_loss(element)) for element in targets])
             .unsqueeze(1)
@@ -300,6 +319,7 @@ def main(args):
         results = postprocess(results)
         targets = postprocess(targets)
 
+        # Saves the results
         for i in range(len(results)):
             torch.save(
                 results[i].clone().cpu(),

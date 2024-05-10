@@ -26,6 +26,9 @@ def load_points_as_images(
     min_depth: float = 1.45,
     max_depth: float = 80.0,
 ):
+    """
+        Transfers 3D point clouds to 2D intensity, depth images, mask, and point xyz values.
+    """
     # load xyz & intensity and add depth & mask
     points = np.fromfile(point_path, dtype=np.float32).reshape((-1, 4))
     xyz = points[:, :3]  # xyz
@@ -118,6 +121,9 @@ def randn_like(
 
 
 def sample_timesteps(self, batch_size: int) -> torch.Tensor:
+    """
+        Random sampling timestep
+    """
     # discrete timesteps
     return torch.randint(
         low=0,
@@ -128,6 +134,9 @@ def sample_timesteps(self, batch_size: int) -> torch.Tensor:
 
 
 def q_sample(x0, steps, noise):
+    """
+        Get sample at specific timesteps
+    """
     beta = cosine_beta_schedule(1024, s=0.008)
     beta = beta[:, None, None, None]
     alpha = 1 - beta
@@ -175,6 +184,7 @@ def main():
     timesteps = [1023, 500, 200, 0]
     fig, axes = plt.subplots(1, len(timesteps), dpi=1000)
 
+    # Visualize the gradual change in timesteps
     for i, t in enumerate(timesteps):
         self_select_steps = torch.IntTensor([t])
         xt = q_sample(image, self_select_steps, noise)

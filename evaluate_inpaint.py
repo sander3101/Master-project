@@ -28,6 +28,9 @@ torch.set_grad_enabled(False)
 
 
 def make_semantickitti_cmap():
+    """
+        Creates colormap for rendering
+    """
     label_colors = {
         0: [0, 0, 0],
         1: [245, 150, 100],
@@ -60,6 +63,9 @@ def make_semantickitti_cmap():
 
 @torch.no_grad()
 def colorize(tensor, cmap_fn=cm.turbo):
+    """
+        Applies colormap to input tensor
+    """
     colors = cmap_fn(np.linspace(0, 1, 256))[:, :3]
     colors = torch.from_numpy(colors).to(tensor)
     tensor = tensor.squeeze(1) if tensor.ndim == 4 else tensor
@@ -71,6 +77,10 @@ def colorize(tensor, cmap_fn=cm.turbo):
 
 @torch.no_grad()
 def evaluate(label, pred, num_classes, epsilon=1e-12):
+    """
+        Calculates evaluation metrics for sampled results
+    """
+
     # PyTorch version of https://github.com/xuanyuzhou98/SqueezeSegV2/blob/master/src/utils/util.py
 
     device = label.device
@@ -94,22 +104,14 @@ def evaluate(label, pred, num_classes, epsilon=1e-12):
     return ious, tps, fps, fns, freqs
 
 
-# define pytorch dataset class
 class Samples(torch.utils.data.Dataset):
-    # def __init__(self, target_dir):
-    #     self.target_paths = list(sorted(list(Path(target_dir).glob("*.pth"))))
-    #     print(f"found {len(self.target_paths)} samples")
+    """
+        Dataclass for handling the sampled results from the model
+    """
 
     def __init__(self, result_dir):
         self.result_paths = list(sorted(list(Path(result_dir).glob("*.pth"))))
         print(f"found {len(self.result_paths)} samples")
-
-    # def __getitem__(self, index):
-    #     gt_path = self.target_paths[index]
-    #     result_path = str(gt_path).replace("targets", "results")
-    #     result = torch.load(result_path, map_location="cpu")
-    #     gt = torch.load(gt_path, map_location="cpu")
-    #     return result, gt
 
     def __getitem__(self, index):
         rst_path = self.result_paths[index]
@@ -125,8 +127,6 @@ class Samples(torch.utils.data.Dataset):
 
 @torch.no_grad()
 def main(args):
-    # torch.backends.cudnn.benchmark = True
-    # torch.set_float32_matmul_precision("high")
 
     device = "cuda"
 
@@ -156,6 +156,7 @@ def main(args):
     scores = defaultdict(float)
     confusion = defaultdict(int)
 
+    # Run evaluation over all samples
     for pred, gt in tqdm(loader, total=len(loader), desc="evaluating..."):
         pred = pred.to(device)
         gt = gt.to(device)
@@ -205,60 +206,10 @@ def main(args):
     ) as f:
         json.dump(scores, f, indent=4)
 
-    # print(result_path)
-
-    # def depth_to_bev(result):
-    #     xyz = result[None, [1, 2, 3]] / 80
-    #     R, t = render_utils.make_Rt(pitch=torch.pi / 3, yaw=torch.pi / 4, z=0.4)
-    #     normal = -render_utils.estimate_surface_normal(xyz)
-    #     normal = (normal + 1) / 2
-    #     bev = 1 - render_utils.render_point_clouds(
-    #         points=einops.rearrange(xyz, "B C H W -> B (H W) C"),
-    #         colors=1 - einops.rearrange(normal, "B C H W -> B (H W) C"),
-    #         R=R.to(xyz),
-    #         t=t.to(xyz),
-    #         size=800,
-    #     )
-    #     return bev[0].permute(1, 2, 0)
-
-    # inputs = torch.stack([result, gt])
-    # mask = inputs[:, [0]] > 0
-    # logits = semseg(preprocess(inputs, mask))
-    # labels = logits.argmax(dim=1, keepdim=True).float() / 19
-    # labels *= mask
-    # labels = torch.cat([labels[[0]], labels[[1]]], dim=2)
-
-    # mask = torch.zeros_like(gt)
-    # mask[:, ::4] = 1
-    # sparse = gt * mask
-    # bev = torch.cat(
-    #     [depth_to_bev(sparse), depth_to_bev(result), depth_to_bev(gt)], dim=1
-    # )
-    # plt.figure(figsize=(20, 20))
-    # plt.imshow(bev, vmin=0, vmax=1, cmap="turbo", interpolation="none")
-    # plt.axis("off")
-    # plt.savefig("bev.png", bbox_inches="tight", pad_inches=0, dpi=300)
-
-    # image = torch.cat([sparse, result, gt], dim=1)
-    # plt.figure(figsize=(20, 20))
-    # plt.imshow(image[0], vmin=0, vmax=80, cmap="turbo", interpolation="none")
-    # plt.axis("off")
-    # plt.savefig("depth.png", bbox_inches="tight", pad_inches=0, dpi=300)
-
-    # plt.figure(figsize=(20, 20))
-    # plt.imshow(image[4], vmin=0, vmax=1, cmap="turbo", interpolation="none")
-    # plt.axis("off")
-    # plt.savefig("reflectance.png", bbox_inches="tight", pad_inches=0, dpi=300)
-
-    # plt.figure(figsize=(20, 20))
-    # plt.imshow(labels[0, 0], vmin=0, vmax=1, cmap=cmap, interpolation="none")
-    # plt.axis("off")
-    # plt.savefig("semseg.png", bbox_inches="tight", pad_inches=0, dpi=300)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--target_dir", type=Path, required=True)
     parser.add_argument("--result_dir", type=Path, required=True)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=8)

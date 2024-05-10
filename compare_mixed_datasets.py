@@ -10,6 +10,7 @@ import os
 
 from utils.render import colorize, make_Rt, render_point_clouds
 
+# Filepaths for the different models trained on various datasets
 methods = [
     "only_quarter_upsample",
     "only_quarter_upsample_all_datasets_kitti360",
@@ -19,6 +20,7 @@ methods = [
     "only_quarter_upsample_tested_on_synlidar",
 ]
 
+# Method names for matching with thesis names
 method_names = [
     "Config C",
     "Config I",
@@ -30,6 +32,9 @@ method_names = [
 
 
 def render_xyz(xyz, max_depth=80.0):
+    """
+        Transfers 2D intensity, depth images, mask, and point xyz values to a 3D point cloud.
+    """
     z_min, z_max = -2 / max_depth, 0.5 / max_depth
     z = (xyz[:, [2]] - z_min) / (z_max - z_min)
     colors = colorize(z.clamp(0, 1), cm.viridis) / 255
@@ -42,12 +47,18 @@ def render_xyz(xyz, max_depth=80.0):
 
 
 def redner_img(img):
+    """
+        Renders image for visualization
+    """
     img = colorize(img)
     img = einops.rearrange(img, "B C H W -> B H W C")
     return img
 
 
 def parse_data(index, root):
+    """
+        Parse data from all baselines
+    """
     root = Path(root)
 
     # Get the shortest of the datasets so that we don't risk index out of range.
@@ -93,6 +104,7 @@ def main():
         constrained_layout=True,
     )
 
+    # Plots all model results in a 2x3 grid
     for i in range(len(methods) // 3):
         ax[0][i].set_title(method_names[i].replace("_", " "), fontsize=30)
         ax[0][i].imshow(BEVs[i])

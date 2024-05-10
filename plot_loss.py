@@ -5,7 +5,13 @@ from matplotlib import pyplot as plt
 
 
 def read_data(file):
+    """
+        Reads the loss datafile
+    """
     def moving_average(data, n=20):
+        """
+            Calculates the moving average
+        """
         return np.convolve(data, np.ones(n), "same") / n
 
     f = open(file)

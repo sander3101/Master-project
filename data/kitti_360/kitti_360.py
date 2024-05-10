@@ -39,6 +39,10 @@ def load_points_as_images(
     min_depth: float = 1.45,
     max_depth: float = 80.0,
 ):
+    """
+        Transfers 3D point clouds to 2D intensity, depth images, mask, and point xyz values.
+    """
+
     # load xyz & intensity and add depth & mask
     points = np.fromfile(point_path, dtype=np.float32).reshape((-1, 4))
     xyz = points[:, :3]  # xyz
@@ -124,10 +128,16 @@ class KITTI360(ds.GeneratorBasedBuilder):
     DEFAULT_CONFIG_NAME = "spherical-1024"
 
     def _parse_config_name(self):
+        """
+            Splits the config names into projection type and image width
+        """
         projection, width = self.config.name.split("-")
         return projection, int(width)
 
     def _info(self):
+        """
+            Creates dataset info
+        """
         _, width = self._parse_config_name()
         features = {
             "sample_id": ds.Value("int32"),
@@ -139,6 +149,9 @@ class KITTI360(ds.GeneratorBasedBuilder):
         return ds.DatasetInfo(features=ds.Features(features))
 
     def _split_generators(self, _):
+        """
+            Parses through all datafolders and collects all data from each folder.
+        """
         splits = list()
         for split, subsets in _SEQUENCE_SPLITS["lidargen"].items():
             file_paths = list()
@@ -154,6 +167,9 @@ class KITTI360(ds.GeneratorBasedBuilder):
         return splits
 
     def _generate_examples(self, items):
+        """
+            Generates a single datapoint
+        """
         projection, width = self._parse_config_name()
         for sample_id, file_path in items:
             xyzrdm = load_points_as_images(

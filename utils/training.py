@@ -8,6 +8,9 @@ from torch.optim.lr_scheduler import LambdaLR
 
 @dataclasses.dataclass
 class TrainingConfig:
+    """
+        Config class that defines all the parameters for training.
+    """
     dataset: Literal["synlidar", "kitti_raw", "kitti_360", "all"] = "kitti_360"
     image_format: str = "log_depth"
     lidar_projection: Literal[
@@ -59,12 +62,18 @@ class TrainingConfig:
     diffusion_objective: Literal["eps", "v", "x_0"] = "eps"
     diffusion_beta_schedule: str = "cosine"
     diffusion_timesteps_type: Literal["continuous", "discrete"] = "continuous"
+    # Parameter defines if model should train on generating point clouds, or be masked to train on inpainting
     diffusion_task: Literal["inpaint", "generate"] = "inpaint"
+    # Defines the inpainting task for training, if mixed is set, all features will be combined
     diffusion_mask: Literal["simple", "complex", "pepper", "upsample", "mixed"] = (
         "mixed"
     )
+    # List contains the desired features for mixed training. 
+    # Features should be written and included in with the same words as in diffusion_mask (mixed is not a feature)
     mixed_tasks = ["complex", "pepper", "upsample"]
+    # Defines sparsity level of the conditional masks
     sparsity_level: float = None
+    # Name of model
     project_name: str = "r2dm_only_complex_pepper_upsample_continous"
 
     ### Remove this before more experiments with coordinates ###
