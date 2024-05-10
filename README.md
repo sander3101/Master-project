@@ -27,7 +27,28 @@ accelerate launch train.py
 
 ## Sampling and Evaluation
 
-Change model path and sampling path and run the bash script for automated training and sampling automated_training_and_sampling.sh, or follow the manual steps for sampling and then evaluation.
+Change model path and sampling path and run the bash script for automated training and sampling automated_training_and_sampling.sh:
+
+```sh
+./automated_training_and_sampling.sh
+```
+
+Alternatively follow the manual steps for sampling and then evaluation:
+
+Sampling:
+```sh
+accelerate launch inpaint_and_save.py \
+    --checkpoint <Path/to/trained/model> \
+    --num_steps <Number of timesteps> \
+    --output_folder <Path/for/storing/results>
+```
+
+Evaluation:
+```sh
+python evaluate_inpaint.py \
+    --result_dir <Path/to/results>
+```
+
 
 ## Acknowledgements
 
